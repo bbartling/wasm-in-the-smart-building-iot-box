@@ -1,5 +1,3 @@
-
-
 //use crate::control_signals::ControlSignal;
 use crate::pid::{PIDController, PIDSettings};
 use crate::sensors::TemperatureSensor;
@@ -22,7 +20,11 @@ pub struct VavBox {
 }
 
 impl VavBox {
-    pub fn new(setpoint: f32, heating_pid_settings: PIDSettings, cooling_pid_settings: PIDSettings) -> Self {
+    pub fn new(
+        setpoint: f32,
+        heating_pid_settings: PIDSettings,
+        cooling_pid_settings: PIDSettings,
+    ) -> Self {
         VavBox {
             current_temp: 21.9,
             setpoint_temp: setpoint,
@@ -30,14 +32,14 @@ impl VavBox {
             temp_sensor: TemperatureSensor::new(21.9), // Initialized with some default value
             heating_pid: PIDController::new(heating_pid_settings, 22.0),
             cooling_pid: PIDController::new(cooling_pid_settings, 25.0), // Added setpoint argument
-            // other fields...
+                                                                         // other fields...
         }
     }
 
     // Method to update the VavBox's current temperature and recalculate its state
     pub fn update_temperature(&mut self, new_temp: f32) {
         self.current_temp = new_temp;
-        
+
         // Recalculate the state based on the new temperature
         self.update_state();
     }
@@ -69,7 +71,11 @@ pub extern "C" fn vavbox_new(setpoint: f32) -> *mut VavBox {
     let heating_pid_settings = PIDSettings::new(1.0, 0.01, 0.001); // Example settings
     let cooling_pid_settings = PIDSettings::new(1.2, 0.02, 0.002); // Example settings
 
-    Box::into_raw(Box::new(VavBox::new(setpoint, heating_pid_settings, cooling_pid_settings)))
+    Box::into_raw(Box::new(VavBox::new(
+        setpoint,
+        heating_pid_settings,
+        cooling_pid_settings,
+    )))
 }
 
 // Assuming this is in `vav_box.rs` or appropriately included in `lib.rs`
@@ -81,7 +87,6 @@ pub extern "C" fn vavbox_update_temperature(vav_box_ptr: *mut VavBox, new_temp: 
     };
     vav_box.update_temperature(new_temp);
 }
-
 
 #[no_mangle]
 pub extern "C" fn vavbox_get_state_code(vav_box_ptr: *mut VavBox) -> u32 {

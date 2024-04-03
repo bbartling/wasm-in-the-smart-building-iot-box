@@ -4,20 +4,31 @@ def load_wasm_module(filepath):
     with open(filepath, 'rb') as file:
         return file.read()
 
+def inspect_wasm_exports(store, instance):
+    print("Inspecting WASM Exports:")
+    for name, export in instance.exports(store).items():
+        # The type of the export can be 'function', 'global', 'memory', or 'table'
+        print(f"Name: {name}, Type: {type(export).__name__}")
+
+
+def print_vav_box_state(state_code):
+    state_map = {1: "Heating", 2: "Cooling", 3: "Satisfied"}
+    print(f"VAV Box State Code: {state_code}")
+    print(f"VAV Box State: {state_map.get(state_code, 'Unknown')}")
+    
 wasm_bytes = load_wasm_module('target/wasm32-unknown-unknown/debug/wasm_vav_control.wasm')
 engine = Engine()
 store = Store(engine)
 module = Module(engine, wasm_bytes)
 instance = Instance(store, module, [])
 
+# Inspect and print all exports
+inspect_wasm_exports(store, instance)
+
 vavbox_new = instance.exports(store)["vavbox_new"]
 vavbox_update_temperature = instance.exports(store)["vavbox_update_temperature"]
 vavbox_get_state_code = instance.exports(store)["vavbox_get_state_code"]
 
-def print_vav_box_state(state_code):
-    state_map = {1: "Heating", 2: "Cooling", 3: "Satisfied"}
-    print(f"VAV Box State Code: {state_code}")
-    print(f"VAV Box State: {state_map.get(state_code, 'Unknown')}")
 
 # Create a new VAV Box with a setpoint temperature
 setpoint_temp = 22.0
