@@ -1,77 +1,44 @@
 # wasm-hvac-controls
-concept ideas of WebAssembly in HVAC controls PLC logic
+G36 concept ideas of WebAssembly in HVAC controls PLC logic
 
-## Project Layout
-```bash
-wasm_vav_control/
-├── Cargo.toml
-└── src/
-    ├── lib.rs
-    ├── vav_box.rs
-    ├── control_signals.rs
-    ├── pid.rs
-    └── sensors.rs
+## Overview
+This project simulates the firmware for controlling a HVAC (Heating, Ventilation, and Air Conditioning) VAV (Variable Air Volume) box. It's designed as a tool for developers, engineers, and enthusiasts to understand, develop, and test the control logic behind the operation of a VAV box in HVAC systems. The simulation covers temperature regulation through heating and cooling demands, air flow control, and PID (Proportional, Integral, Derivative) control strategies to maintain the desired setpoints.
+
+## Features
+* `Temperature Setpoint Control`: Simulate changes in the space temperature and adjust the VAV box settings to reach and maintain a specified temperature setpoint.
+* `Heating and Cooling Demand Calculation`: Dynamically calculate the heating and cooling demands based on the difference between the current temperature and the setpoint.
+* `Airflow Control`: Adjust the airflow based on the mode of operation (heating, cooling, or satisfied) to efficiently meet the temperature requirements.
+* `PID Control for Heating and Cooling`: Utilize PID control strategies for precise control over heating and cooling processes, including adjustments for integral windup prevention.
+* `State Machines for Sensor Reliability`: (TODO) Implement state machines to manage sensor data reliability, G36 fault detection rules, "requests" for VAV box heat/cool/air, integral windup prevention, and occupancy state for unoc zone temperature setpoints.
+
+## G36 VAV Box Spec
+The system's state—whether heating, cooling, or satisfied—is determined by the deviation of the zone temperature from the setpoint, also referred to as the zone temperature error. According to G36 guidelines, separate PID controllers are employed for heating and cooling. The outputs of these controllers dictate adjustments: In heating mode, both the discharge air temperature setpoint and the air flow setpoint may be reset based on the values of the heating PID output. In cooling mode, adjustments involve only the air flow setpoint reset, based on the cooling PID output.
+
+```mermaid
+flowchart TD
+    A[Start] --> B{Calculate Zone Temp Error}
+    B --> C[Set Cool and Heat Demands to Zero]
+    C --> D{Is Error within Deadband?}
+    D -- Yes --> E[Satisfied Mode]
+    D -- No --> F{Error > 0?}
+    F -- Yes --> G[Heating Mode]
+    F -- No --> H[Cooling Mode]
+    G --> I{Heating Demand <= 50?}
+    I -- Yes --> J[Set DAT from AHU SAT to MAX DAT]
+    I -- No --> K[Keep DAT at MAX, Adjust Airflow]
+    H --> L[Calculate Cooling Demand, Set DAT & Airflow]
+    E --> M[Set DAT to AHU SAT, Airflow to Satisfied Setpoint]
+    J --> N[Ensure PIDs are within 0-100%]
+    K --> N
+    L --> N
+    N --> O[End]
+
+    style E fill:#f9f,stroke:#333,stroke-width:2px
+    style G fill:#bbf,stroke:#333,stroke-width:2px
+    style H fill:#bbf,stroke:#333,stroke-width:2px
+    style J fill:#bfb,stroke:#333,stroke-width:2px
+    style K fill:#bfb,stroke:#333,stroke-width:2px
+    style L fill:#bfb,stroke:#333,stroke-width:2px
+    style M fill:#f9f,stroke:#333,stroke-width:2px
+    style N fill:#ff9,stroke:#333,stroke-width:2px
 ```
-
-* **lib.rs**: The crate root, which orchestrates the module inclusion and potentially re-exports key functionalities.
-* **vav_box.rs**: Defines the VavBox struct and its basic functionalities, like temperature updates and state management.
-* **control_signals.rs**: Manages the control signals for heating, cooling, and airflow, possibly including the logic for opening and closing valves or adjusting dampers.
-* **pid.rs**: Contains PID control algorithms that can be used for maintaining setpoints for temperature, airflow, and other parameters.
-* **sensors.rs**: Handles sensor input, such as temperature sensors, airflow sensors, etc. This could include simulating sensor input or interfacing with real sensor data.
-
-## VAV Box Firmware Simulation
-This project demonstrates a basic simulation of a Variable Air Volume (VAV) box firmware using Rust and WebAssembly (WASM), with interactions facilitated through a Python script. The Rust portion models the VAV box, incorporating features like temperature sensing, PID control for heating and cooling, and state management. The compiled WASM module is then utilized from Python to simulate different environmental scenarios affecting the VAV box.
-
-#### Structure
-* **Rust:** The core logic, including the VAV box model (VavBox), PID controller (PIDController), and temperature sensor (TemperatureSensor), is implemented in Rust. This code is compiled to a WASM module, making it accessible from other languages like Python.
-* **Python:** A Python script interacts with the WASM module, simulating external temperature changes and querying the VAV box state.
-
-#### Prerequisites
-* Rust and Cargo (latest stable version)
-* Python 3.x
-* wasmtime Python package for running WASM
-
-#### Compilation
-To compile the Rust code to a WASM module, navigate to the project root and run:
-
-```bash
-cargo build --target wasm32-unknown-unknown
-```
-
-This command generates a WASM binary in `target/wasm32-unknown-unknown/debug/`.
-
-#### Interacting with the WASM Module from Python
-The Python script (`py_tester.py`) demonstrates how to load the WASM module, create a new instance of the VavBox, and simulate temperature changes to observe the VAV box's responses.
-
-1. **Loading the WASM Module**: The script uses the wasmtime package to load the compiled WASM file.
-2. **Creating a VAV Box Instance**: A new VAV box instance is created with a specified setpoint temperature.
-3. **Simulating Temperature Changes**: The script updates the VAV box's temperature to simulate different environmental conditions (e.g., heating, cooling, satisfied).
-4. **Querying the State**: After each temperature update, the script queries and prints the VAV box's state to demonstrate how the firmware would react to the changes.
-
-#### Running the Simulation in Py
-Ensure you've installed the required Python packages:
-```bash
-pip install wasmtime
-```
-
-Run the Python script:
-```bash
-python py_tester.py
-```
-
-#### Example Output
-```bash
-Scenario 1: Simulate Heating
-VAV Box State Code: 1
-VAV Box State: Heating
-
-Scenario 2: Simulate Cooling
-VAV Box State Code: 2
-VAV Box State: Cooling
-
-Scenario 3: Simulate Satisfied
-VAV Box State Code: 3
-VAV Box State: Satisfied
-```
-
-This output demonstrates how the VAV box firmware, simulated through Rust and WebAssembly, responds to different temperature inputs as if it were embedded firmware controlling an actual VAV box in an HVAC system.
