@@ -42,3 +42,31 @@ flowchart TD
     style M fill:#f9f,stroke:#333,stroke-width:2px
     style N fill:#ff9,stroke:#333,stroke-width:2px
 ```
+
+## Test compile with `gcc` on Windows
+This is just to make sure the C files compile okay to a Windows `.dll` which isnt used for anything.
+```bash
+> gcc -shared -o VavBoxController.dll VavBoxController.c
+```
+
+## Compile to WASM notes with Emscripten on Windows
+Setup per directions from Emscripten [website](https://emscripten.org/index.html) which requires python and node installed on your pc. These are some notes for my commands used to get the Emscripten virtual env after the install was okay.
+
+```bash
+# inside the `emsdk` directory.
+
+> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+> emsdk activate latest
+> $env:PATH = "C:\Users\bbartling\Desktop\emsdk;" + $env:PATH
+> $env:EMSDK = "C:\Users\bbartling\Desktop\emsdk"
+> $env:EMSDK_NODE = "C:\Users\bbartling\Desktop\emsdk\node\16.20.0_64bit\bin\node.exe"
+
+# test install okay
+> emcc --version
+```
+Output the `.c` files to a `.wasm`.
+```bash
+> emcc VavBoxController.c -s SIDE_MODULE=1 -s EXPORTED_FUNCTIONS='["_VavBoxController_init","_control_logic","_calc_heating_pid","_calc_cooling_pid","_update_setpoint"]' -o vav_controller.wasm
+```
+
+## Test `vav_controller.wasm` with Py with wastime
