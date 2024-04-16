@@ -29,10 +29,13 @@ linker.define(store, "env", "setPoint", set_point)
 
 # Instantiate the module with the linker
 instance = linker.instantiate(store, module)
-calculate_output = instance.exports(store)["control_logic"]
+
+control_logic = instance.exports(store)["control_logic"]
 integral_heating = instance.exports(store)["integral_heating"]
 integral_cooling = instance.exports(store)["integral_cooling"]
 control_mode = instance.exports(store)["control_mode"]
+error = instance.exports(store)["error"]
+
 
 def simulate_with_wasm():
 
@@ -47,35 +50,41 @@ def simulate_with_wasm():
     print("\nTesting Heating Demand with Constant Temperature outside Deadband")
     for step in range(10):
         space_temp.set_value(store, wasmtime.Val.f64(constant_heating_temp)) 
+        control_logic(store)
 
-        output = calculate_output(store)
-        mode = calculate_output(store)
+        output = instance.exports(store)["output"]
+        mode = instance.exports(store)["mode"]
         mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
         print(f"************* STEP: {step+1} *************")
-        print(f"Current Temp = {space_temp.value(store):.2f}F, Mode = {mode_desc[mode]}, PI % Output = {output:.2f}%")
+        print(f"Current Temp = {space_temp.value(store):.2f}F, Mode = {mode_desc[mode.value(store)]}")
+        print(f"PI % Output = {output.value(store):.2f}%, Space Temp Error = {error.value(store):.2f} degrees, ")
         print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
 
 
     print("\nTesting Satisfied Mode within Deadband")
     for step in range(5):
         space_temp.set_value(store, wasmtime.Val.f64(satisfied_temp))
+        control_logic(store)
 
-        output = calculate_output(store)
-        mode = calculate_output(store)
+        output = instance.exports(store)["output"]
+        mode = instance.exports(store)["mode"]
         mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
         print(f"************* STEP: {step+1} *************")
-        print(f"Current Temp = {space_temp.value(store):.2f}F, Mode = {mode_desc[mode]}, PI % Output = {output:.2f}%")
+        print(f"Current Temp = {space_temp.value(store):.2f}F, Mode = {mode_desc[mode.value(store)]}")
+        print(f"PI % Output = {output.value(store):.2f}%, Space Temp Error = {error.value(store):.2f} degrees, ")
         print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
 
     print("\nTesting Cooling Demand with Constant Temperature outside Deadband")
     for step in range(5, steps):
         space_temp.set_value(store, wasmtime.Val.f64(constant_cooling_temp))
+        control_logic(store)
 
-        output = calculate_output(store)
-        mode = calculate_output(store)
+        output = instance.exports(store)["output"]
+        mode = instance.exports(store)["mode"]
         mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
         print(f"************* STEP: {step+1} *************")
-        print(f"Current Temp = {space_temp.value(store):.2f}F, Mode = {mode_desc[mode]}, PI % Output = {output:.2f}%")
+        print(f"Current Temp = {space_temp.value(store):.2f}F, Mode = {mode_desc[mode.value(store)]}")
+        print(f"PI % Output = {output.value(store):.2f}%, Space Temp Error = {error.value(store):.2f} degrees, ")
         print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
 
 
