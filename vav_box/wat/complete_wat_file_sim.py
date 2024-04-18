@@ -1,5 +1,5 @@
 import wasmtime
-
+import random
 
 # Initialize the WASM environment
 engine = wasmtime.Engine()
@@ -22,10 +22,17 @@ set_point = wasmtime.Global(
     wasmtime.Val.f64(72.0),
 )
 
+ahu_sat = wasmtime.Global(
+    store,
+    wasmtime.GlobalType(wasmtime.ValType.f64(), mutable=True),
+    wasmtime.Val.f64(61.0),
+)
+
 
 # Define globals in the linker to match the module imports
 linker.define(store, "env", "space_temp", space_temp)
-linker.define(store, "env", "setPoint", set_point)
+linker.define(store, "env", "set_point", set_point)
+linker.define(store, "env", "ahu_sat", ahu_sat)
 
 # Instantiate the module with the linker
 instance = linker.instantiate(store, module)
@@ -33,63 +40,50 @@ instance = linker.instantiate(store, module)
 control_logic = instance.exports(store)["control_logic"]
 integral_heating = instance.exports(store)["integral_heating"]
 integral_cooling = instance.exports(store)["integral_cooling"]
-control_mode = instance.exports(store)["control_mode"]
+output_heating = instance.exports(store)["output_heating"]
+output_cooling = instance.exports(store)["output_cooling"]
+dat_setpoint = instance.exports(store)["dat_setpoint"]
+
 error = instance.exports(store)["error"]
+mode = instance.exports(store)["mode"]
+
+# Simulation parameters
+satisfied_zone_temp = 73.0
+constant_heating_zone_temp = 66.0
+constant_cooling_zone_temp = 78.0
+
+satisfied_ahu_discharge_temp = 60.0
+cooling_ahu_discharge_temp = 55.0
+heating_ahu_discharge_temp = 65.0
 
 
-def simulate_with_wasm():
+def gradual_transition(start_temp, end_temp, start_ahu_temp, end_ahu_temp, steps):
+    """Generate lists of temperatures for a smooth transition for both space temp and AHU discharge temp."""
+    space_temps = [start_temp + (end_temp - start_temp) * i / (steps - 1) for i in range(steps)]
+    ahu_temps = [start_ahu_temp + (end_ahu_temp - start_ahu_temp) * i / (steps - 1) for i in range(steps)]
+    return list(zip(space_temps, ahu_temps))
 
-    # Simulation parameters
-    satisfied_temp = 73.0
-    constant_cooling_temp = 78.0
-    constant_heating_temp = 66.0
-    steps = 60
+def simulate_with_ahu_transitions():
+    control_logic = instance.exports(store)["control_logic"]
+    mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
+    
+    # Define transitions including small random fluctuations around the target AHU temperatures
+    heating_transition = gradual_transition(73.0, 66.0, 60.0, 65.0, 20)  # From satisfied to heating
+    cooling_transition = gradual_transition(66.0, 78.0, 65.0, 55.0, 20)  # From heating to cooling
 
-    print(f"Initial Temp = {space_temp.value(store)}F, Set Point = {set_point.value(store)}F")
-
-    print("\nTesting Heating Demand with Constant Temperature outside Deadband")
-    for step in range(20):
-        space_temp.set_value(store, wasmtime.Val.f64(constant_heating_temp)) 
-        control_logic(store)
-
-        output_heating = instance.exports(store)["output_heating"]
-        output_cooling = instance.exports(store)["output_cooling"]
-        mode = instance.exports(store)["mode"]
-        mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
-        print(f"************* STEP: {step+1} *************")
-        print(f"Current Temp = {space_temp.value(store):.2f}F, Space Temp Error = {error.value(store):.2f} degrees, Mode = {mode_desc[mode.value(store)]}")
+    # Run simulation for each transition
+    for space_temp_value, ahu_temp_value in heating_transition + cooling_transition:
+        fluctuated_ahu_temp = ahu_temp_value + random.uniform(-1.0, 1.0)  # Adding random fluctuation
+        space_temp.set_value(store, wasmtime.Val.f64(space_temp_value))
+        ahu_sat.set_value(store, wasmtime.Val.f64(fluctuated_ahu_temp))
+        control_logic(store)  # Set values in the WASM file
+        print(f" ***************** ***************** ***************** ***************** ***************** ")
+        print(f"Current Temp = {space_temp.value(store):.2f}F, Set Point = {set_point.value(store)}F")
+        print(f"Space Temp Error = {error.value(store):.2f}F, Mode = {mode_desc[mode.value(store)]}")
         print(f"Heating PI % Output = {output_heating.value(store):.2f}%, Cooling PI % Output = {output_cooling.value(store):.2f}%")
         print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
 
 
-    print("\nTesting Satisfied Mode within Deadband")
-    for step in range(5):
-        space_temp.set_value(store, wasmtime.Val.f64(satisfied_temp))
-        control_logic(store)
 
-        output_heating = instance.exports(store)["output_heating"]
-        output_cooling = instance.exports(store)["output_cooling"]
-        mode = instance.exports(store)["mode"]
-        mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
-        print(f"************* STEP: {step+1} *************")
-        print(f"Current Temp = {space_temp.value(store):.2f}F, Space Temp Error = {error.value(store):.2f} degrees, Mode = {mode_desc[mode.value(store)]}")
-        print(f"Heating PI % Output = {output_heating.value(store):.2f}%, Cooling PI % Output = {output_cooling.value(store):.2f}%")
-        print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
+simulate_with_ahu_transitions()
 
-
-    print("\nTesting Cooling Demand with Constant Temperature outside Deadband")
-    for step in range(5, steps):
-        space_temp.set_value(store, wasmtime.Val.f64(constant_cooling_temp))
-        control_logic(store)
-
-        output_heating = instance.exports(store)["output_heating"]
-        output_cooling = instance.exports(store)["output_cooling"]
-        mode = instance.exports(store)["mode"]
-        mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
-        print(f"************* STEP: {step+1} *************")
-        print(f"Current Temp = {space_temp.value(store):.2f}F, Space Temp Error = {error.value(store):.2f} degrees, Mode = {mode_desc[mode.value(store)]}")
-        print(f"Heating PI % Output = {output_heating.value(store):.2f}%, Cooling PI % Output = {output_cooling.value(store):.2f}%")
-        print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
-
-
-simulate_with_wasm()
