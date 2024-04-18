@@ -9,7 +9,7 @@ KI = 1.0
 # Load the WASM module.
 engine = wasmtime.Engine()
 store = wasmtime.Store(engine)
-module = wasmtime.Module.from_file(engine, './wat/simple_sim.wat')
+module = wasmtime.Module.from_file(engine, './simple_sim.wat')
 
 # Create a linking environment
 linker = wasmtime.Linker(engine)
