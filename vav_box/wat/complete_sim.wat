@@ -2,6 +2,12 @@
   ;; Import external values and parameters
   (import "env" "zone_air_temp" (global $zone_air_temp (mut f64)))
   (import "env" "ahu_supply_air_temp" (global $ahu_supply_air_temp (mut f64)))
+  ;; VAV box air flow param settings
+  (import "env" "clg_flow_min_air_flow_setpoint" (global $clg_flow_min_air_flow_setpoint (mut f64)))
+  (import "env" "clg_flow_max_air_flow_setpoint" (global $clg_flow_max_air_flow_setpoint (mut f64)))
+  (import "env" "satisfied_flow_min_air_flow_setpoint" (global $satisfied_flow_min_air_flow_setpoint (mut f64)))
+  (import "env" "htg_flow_min_air_flow_setpoint" (global $htg_flow_min_air_flow_setpoint (mut f64)))
+  (import "env" "htg_flow_max_air_flow_setpoint" (global $htg_flow_max_air_flow_setpoint (mut f64)))
 
   ;; PID parameters for heating and cooling (no derivative term)
   (global $Kp_heating f64 (f64.const 5.0))
@@ -30,11 +36,6 @@
 
   ;; vars for vav box air flow reset
   (global $discharge_air_flow_setpoint (mut f64) (f64.const 0))
-  (global $clg_flow_min_air_flow_setpoint (mut f64) (f64.const 250))
-  (global $clg_flow_max_air_flow_setpoint (mut f64) (f64.const 1000))
-  (global $satisfied_flow_min_air_flow_setpoint (mut f64) (f64.const 150))
-  (global $htg_flow_min_air_flow_setpoint (mut f64) (f64.const 200))
-  (global $htg_flow_max_air_flow_setpoint (mut f64) (f64.const 750))
 
   ;; Generic PI calculation function that updates global state
   (func $calculate_pid

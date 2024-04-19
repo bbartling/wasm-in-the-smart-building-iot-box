@@ -1,5 +1,6 @@
 import wasmtime
 import random
+import matplotlib.pyplot as plt
 
 # Initialize the WASM environment
 engine = wasmtime.Engine()
@@ -28,11 +29,47 @@ ahu_supply_air_temp = wasmtime.Global(
     wasmtime.Val.f64(61.0),
 )
 
+clg_flow_min_air_flow_setpoint = wasmtime.Global(
+    store,
+    wasmtime.GlobalType(wasmtime.ValType.f64(), mutable=True),
+    wasmtime.Val.f64(50.0),
+)
+
+clg_flow_max_air_flow_setpoint = wasmtime.Global(
+    store,
+    wasmtime.GlobalType(wasmtime.ValType.f64(), mutable=True),
+    wasmtime.Val.f64(1000.0),
+)
+
+satisfied_flow_min_air_flow_setpoint = wasmtime.Global(
+    store,
+    wasmtime.GlobalType(wasmtime.ValType.f64(), mutable=True),
+    wasmtime.Val.f64(50.0),
+)
+
+htg_flow_min_air_flow_setpoint = wasmtime.Global(
+    store,
+    wasmtime.GlobalType(wasmtime.ValType.f64(), mutable=True),
+    wasmtime.Val.f64(100.0),
+)
+
+htg_flow_max_air_flow_setpoint = wasmtime.Global(
+    store,
+    wasmtime.GlobalType(wasmtime.ValType.f64(), mutable=True),
+    wasmtime.Val.f64(850.0),
+)
+
+
 
 # Define globals in the linker to match the module imports
 linker.define(store, "env", "zone_air_temp", zone_air_temp)
 linker.define(store, "env", "set_point", set_point)
 linker.define(store, "env", "ahu_supply_air_temp", ahu_supply_air_temp)
+linker.define(store, "env", "clg_flow_min_air_flow_setpoint", clg_flow_min_air_flow_setpoint)
+linker.define(store, "env", "clg_flow_max_air_flow_setpoint", clg_flow_max_air_flow_setpoint)
+linker.define(store, "env", "satisfied_flow_min_air_flow_setpoint", satisfied_flow_min_air_flow_setpoint)
+linker.define(store, "env", "htg_flow_min_air_flow_setpoint", htg_flow_min_air_flow_setpoint)
+linker.define(store, "env", "htg_flow_max_air_flow_setpoint", htg_flow_max_air_flow_setpoint)
 
 # Instantiate the module with the linker
 instance = linker.instantiate(store, module)
@@ -68,11 +105,23 @@ def simulate_with_ahu_transitions():
     mode_desc = {0: 'Satisfied', 1: 'Heating', 2: 'Cooling'}
     
     # Define transitions including small random fluctuations around the target AHU temperatures
-    heating_transition = gradual_transition(73.0, 66.0, 60.0, 65.0, 20)  # From satisfied to heating
-    cooling_transition = gradual_transition(66.0, 78.0, 65.0, 55.0, 20)  # From heating to cooling
+    heating_to_satisfied_transition = gradual_transition(66.0, 72.0, 65.0, 60.0, 30)  # From heating to satisfied
+    satisfied_to_cooling_transition = gradual_transition(72.0, 80.0, 60.0, 55.0, 30)  # From satisfied to cooling
+
+    transitions = heating_to_satisfied_transition + satisfied_to_cooling_transition
+
+
+    # Lists to store data for plotting
+    zone_temps = []
+    zone_errors = []
+    modes = []
+    heating_outputs = []
+    cooling_outputs = []
+    discharge_air_temp_setpoints = []
+    discharge_air_flow_setpoints = []
 
     # Run simulation for each transition
-    for zone_air_temp_value, ahu_temp_value in heating_transition + cooling_transition:
+    for zone_air_temp_value, ahu_temp_value in transitions:
         fluctuated_ahu_temp = ahu_temp_value + random.uniform(-1.0, 1.0)  # Adding random fluctuation
         zone_air_temp.set_value(store, wasmtime.Val.f64(zone_air_temp_value))
         ahu_supply_air_temp.set_value(store, wasmtime.Val.f64(fluctuated_ahu_temp))
@@ -84,6 +133,34 @@ def simulate_with_ahu_transitions():
         print(f"Heating PI % Output = {pid_output_heating.value(store):.2f}%, Cooling PI % Output = {pid_output_cooling.value(store):.2f}%")
         print(f"Heating Integral = {integral_heating.value(store):.2f}, Cooling Integral = {integral_cooling.value(store):.2f}")
         print(f"Calculated Discharge Air Temp Spt = {discharge_air_temp_setpoint.value(store):.2f}F, Calculated Discharge Air Flow Spt = {discharge_air_flow_setpoint.value(store):.2f} CFM")
+
+        # Store data
+        zone_temps.append(zone_air_temp.value(store))
+        zone_errors.append(zone_air_temp_error.value(store))
+        modes.append(mode_desc[mode.value(store)])
+        heating_outputs.append(pid_output_heating.value(store))
+        cooling_outputs.append(pid_output_cooling.value(store))
+        discharge_air_temp_setpoints.append(discharge_air_temp_setpoint.value(store))
+        discharge_air_flow_setpoints.append(discharge_air_flow_setpoint.value(store))
+
+    # Plotting the results
+    fig, ax = plt.subplots(4, 1, figsize=(10, 10))
+    ax[0].plot(zone_temps, label='Zone Temperature')
+    ax[0].plot(discharge_air_temp_setpoints, label='Discharge Air Setpoint Temperature')
+    ax[0].legend()
+
+    ax[1].plot(discharge_air_flow_setpoints, label='Discharge Air Flow Setpoint')
+    ax[1].legend()
+
+    ax[2].plot(heating_outputs, label='Heating PI Output')
+    ax[2].plot(cooling_outputs, label='Cooling PI Output')
+    ax[2].legend()
+
+    ax[3].plot(modes, label='Modes')
+    #ax[3].plot(zone_errors, label='Zone Temp Error')
+    ax[3].legend()
+
+    plt.show()
 
 
 simulate_with_ahu_transitions()
