@@ -1,7 +1,5 @@
 /target
 
-*.wasm
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

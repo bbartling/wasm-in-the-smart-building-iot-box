@@ -1,0 +1,13 @@
+[package]
+name = "rs_vav_box_firmware"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2.92"
+
+[profile.release]
+lto = true
