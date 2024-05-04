@@ -1,0 +1,26 @@
+@startuml
+
+class WebAssembly_Inputs {
+    + $zone_air_temp: f64
+    + $ahu_supply_air_temp: f64
+    + $clg_flow_min_air_flow_setpoint: f64
+    + $clg_flow_max_air_flow_setpoint: f64
+    + $satisfied_flow_min_air_flow_setpoint: f64
+    + $htg_flow_min_air_flow_setpoint: f64
+    + $htg_flow_max_air_flow_setpoint: f64
+}
+
+class WebAssembly_Exports {
+    + $pid_output_heating: f64
+    + $pid_output_cooling: f64
+    + $integral_heating: f64
+    + $integral_cooling: f64
+    + $mode: i32
+    + $zone_air_temp_error: f64
+    + $discharge_air_temp_setpoint: f64
+    + $discharge_air_flow_setpoint: f64
+}
+
+WebAssembly_Inputs -- WebAssembly_Exports : " <<Algorithm Processing>>" 
+
+@enduml
