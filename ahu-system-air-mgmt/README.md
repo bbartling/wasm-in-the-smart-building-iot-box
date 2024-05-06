@@ -1,12 +1,13 @@
 # ahu-system-air-mgmt
 
-Let's make an algorithm where you feed in data of the AHU VAV system to adjust VAV box MIN air flow setpoints.
+AHU VAV system to adjust VAV box MIN air flow setpoints based on real occupancy counts of people in space via 62.1.
 
 ## Mechanical Engineer Take Off
-TODO make writeup about engineer take off requirements which needs to happen first before any IoT work or interaction with the BAS. There needs to be some sort of upfront mechanical HVAC engineer take off to come up with ASHRAE 62.1 params.
+Mechanical engineer can do take-off's of existing VAV system design and then optimized for latest ventilation code requirements. This is a Taylor Engineering tool to assist with the take off of the existing HVAC design:
 https://tayloreng.egnyte.com/dl/tjSgwpRxaN/Zone_Ventilation_Calculation_Tool.xlsx_
 
 ## Py Script
+TODO make write up about how code works and could work in IoT edge device.
 
 ## TODO
 * convert to Rust and WebAssembly with WASI environment?

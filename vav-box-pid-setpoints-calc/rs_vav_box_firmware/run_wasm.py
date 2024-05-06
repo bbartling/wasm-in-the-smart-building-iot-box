@@ -14,7 +14,6 @@ module = wasmtime.Module.from_file(engine, './pkg/rs_vav_box_firmware_bg.wasm')
 linker = wasmtime.Linker(engine)
 instance = linker.instantiate(store, module)
 
-
 # Access exported functions and memory
 set_zone_air_temp = instance.exports(store)["set_zone_air_temp"]
 set_zone_air_temp_setpoint = instance.exports(store)["set_zone_air_temp_setpoint"]
