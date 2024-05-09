@@ -1,52 +1,65 @@
-
-'''
-compiled with
-$ cargo build --target wasm32-wasi --release
-
-'''
-
 import wasmtime
 
-def print_greet(instance, store):
-    greet_func = instance.exports(store)["greet"]
-    ptr = greet_func(store)
+def custom_print_greet(instance, store, input_str):
     memory = instance.exports(store)["memory"]
-    data = memory.data_ptr(store)
-    result = []
-    i = 0
-    while data[ptr + i] != 0:
-        result.append(chr(data[ptr + i]))
-        i += 1
-    string = ''.join(result)
-    print(string)
+    greet_func = instance.exports(store)["custom_greet"]
+
+    # Encode the input string to bytes
+    input_bytes = input_str.encode('utf-8')
+
+    # Get available memory length and calculate the position to write the input bytes
+    memory_length = memory.data_len(store)
+    input_ptr = memory_length - len(input_bytes) - 1
+
+    print(f"Writing to memory: Input string bytes = {input_bytes}")
+    print(f"Memory data length = {memory_length}, Input pointer = {input_ptr}")
+
+    # Write the input bytes to memory
+    if input_ptr + len(input_bytes) > memory_length:
+        raise Exception("Not enough space in memory to write the input bytes")
+    
+    memory.write(store, input_bytes, start=input_ptr)
+    print("String written to WASM memory at pointer", input_ptr)
+
+    # Call the custom greet function with the pointer to the input string
+    ptr = greet_func(store, input_ptr)
+    print(f"Received pointer from custom_greet: {ptr}")
+
+    # Read the result string from WASM memory
+    result_bytes = []
+    offset = 0
+    while True:
+        byte = memory.read(store, start=ptr + offset, stop=ptr + offset + 1)[0]
+        if byte == 0:
+            break
+        result_bytes.append(byte)
+        offset += 1
+    string = bytes(result_bytes).decode('utf-8')
+    print(f"Resulting string: {string}")
+
+    # Free the allocated string in WASM
     free_func = instance.exports(store)["free_string"]
     free_func(store, ptr)
+    print("Freed memory at pointer:", ptr)
 
-# Create the WasiConfig without redirecting stdout
+# Configuration and module loading
 wasi_config = wasmtime.WasiConfig()
-wasi_config.inherit_stdout() 
-#wasi_config.stdout_file = "output.txt"
+wasi_config.inherit_stdout()
 
-# Create the engine
 engine = wasmtime.Engine()
-
-# Create the store and apply the WASI configuration
 store = wasmtime.Store(engine)
 store.set_wasi(wasi_config)
 
-# Load the WASM module
 module_path = './target/wasm32-wasi/release/rs_wasmtime_tutorial.wasm'
 module = wasmtime.Module.from_file(engine, module_path)
 
-# Set up the linker and define WASI
 linker = wasmtime.Linker(engine)
 linker.define_wasi()
 
-# Instantiate the module
 instance = linker.instantiate(store, module)
 
-# Call the function to print the greeting
-print_greet(instance, store)
+# Pass a custom string and print the greeting
+custom_print_greet(instance, store, "World")
 
 # Example usage of the add function
 add_func = instance.exports(store)["add"]
