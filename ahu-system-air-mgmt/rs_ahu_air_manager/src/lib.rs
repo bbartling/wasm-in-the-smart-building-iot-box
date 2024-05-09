@@ -28,15 +28,27 @@ struct SystemConfig {
 
 #[no_mangle]
 pub extern "C" fn create_system_config(config_json: *const c_char) -> *mut c_char {
-    let config_str = unsafe { CStr::from_ptr(config_json).to_str().unwrap() };
-    let system_config: SystemConfig = serde_json::from_str(config_str).unwrap();
+    let config_str = unsafe { 
+        assert!(!config_json.is_null());
+        match CStr::from_ptr(config_json).to_str() {
+            Ok(str) => str,
+            Err(_) => return std::ptr::null_mut()  // Handle invalid UTF-8 gracefully
+        }
+    };
+    let system_config: SystemConfig = match serde_json::from_str(config_str) {
+        Ok(config) => config,
+        Err(_) => return std::ptr::null_mut()  // Handle JSON parsing errors
+    };
     println!("System configuration created with {} zones.", system_config.zones.len());
-    let config_json = serde_json::to_string(&system_config).unwrap();
-    let c_string = CString::new(config_json).expect("CString::new failed");
+    let config_json = match serde_json::to_string(&system_config) {
+        Ok(json) => json,
+        Err(_) => return std::ptr::null_mut()  // Handle serialization errors
+    };
+    let c_string = CString::new(config_json).unwrap_or_else(|_| CString::new("").unwrap()); // Handle NUL errors in JSON
     let ptr = c_string.into_raw();
-    println!("SystemConfig JSON allocated at pointer {:?}", ptr);
     ptr
 }
+
 
 #[no_mangle]
 pub extern "C" fn free_system_config(ptr: *mut c_char) {
