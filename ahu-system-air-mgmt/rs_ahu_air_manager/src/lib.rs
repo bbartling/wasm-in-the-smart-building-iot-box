@@ -83,3 +83,50 @@ pub extern "C" fn free_string(s: *mut c_char) {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::{CString, CStr};
+
+    #[test]
+    fn test_create_system_config_valid() {
+        let input = r#"{
+            "zones": {
+                "zone1": {"az_sqft": 1000, "ra_cfm_per_sqft": 1.0, "rp_cfm_per_person": 5.0, "cfm_min": 200, "cfm_max": 500}
+            },
+            "ashrae_standards": {"ez": 0.8, "co2_sf_per_person": 40, "people_limit_for_co2": 10, "area_limit_for_co2": 150}
+        }"#;
+        let c_input = CString::new(input).unwrap();
+        let ptr = create_system_config(c_input.as_ptr());
+
+        unsafe {
+            assert!(!ptr.is_null());
+            let output = CStr::from_ptr(ptr).to_str().unwrap();
+            println!("Output JSON: {}", output);
+            assert!(output.contains("zone1"));
+            free_system_config(ptr);
+        }
+    }
+
+    #[test]
+    fn test_create_system_config_invalid_json() {
+        let input = r#"{"zones": {"zone1": {"az_sqft": "not an integer"}}}"#;
+        let c_input = CString::new(input).unwrap();
+        let ptr = create_system_config(c_input.as_ptr());
+
+        assert!(ptr.is_null());
+    }
+
+    #[test]
+    fn test_version() {
+        let ptr = version();
+        unsafe {
+            assert!(!ptr.is_null());
+            let version_info = CStr::from_ptr(ptr).to_str().unwrap();
+            assert_eq!(version_info, "Version 1.0 of HVAC System Configurations");
+            free_string(ptr);
+        }
+    }
+}
