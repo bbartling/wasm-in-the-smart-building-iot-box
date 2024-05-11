@@ -1,18 +1,13 @@
-import json
 import wasmtime
 
-# Define the HVAC system configuration
-system_config = {
-    'zones': {
-        'zone1': {'az_sqft': 1000, 'ra_cfm_per_sqft': 1.0, 'rp_cfm_per_person': 5.0, 'cfm_min': 200, 'cfm_max': 500},
-        'zone2': {'az_sqft': 2000, 'ra_cfm_per_sqft': 1.0, 'rp_cfm_per_person': 5.0, 'cfm_min': 400, 'cfm_max': 1000},
-        'zone3': {'az_sqft': 1500, 'ra_cfm_per_sqft': 1.0, 'rp_cfm_per_person': 5.0, 'cfm_min': 300, 'cfm_max': 750},
-    },
-    'ashrae_standards': {'ez': 0.8, 'co2_sf_per_person': 40, 'people_limit_for_co2': 10, 'area_limit_for_co2': 150},
-}
+# compile with
+# $ cargo build --target wasm32-wasi --release
+
+'''
+NOT WORKING YET
+'''
 
 def setup_environment():
-    # Create a WASI configuration and set up the environment
     wasi_config = wasmtime.WasiConfig()
     wasi_config.inherit_stdout()
     wasi_config.inherit_stderr()
@@ -24,32 +19,19 @@ def setup_environment():
     linker = wasmtime.Linker(engine)
     linker.define_wasi()
 
-    # Load the compiled WebAssembly module
     module_path = './target/wasm32-wasi/release/rs_ahu_air_manager.wasm'
     module = wasmtime.Module.from_file(engine, module_path)
     instance = linker.instantiate(store, module)
 
     return store, instance
 
-def create_system_config(config_json, store, instance):
-    """Create the HVAC system configuration in Rust from JSON"""
-    memory = instance.exports(store)["memory"]
-    config_bytes = config_json.encode('utf-8')
-    
-    # Ensure there is enough memory and find a suitable place to write
-    memory_length = memory.data_len(store)
-    config_ptr = memory_length - len(config_bytes)
-    if config_ptr < 0 or (config_ptr + len(config_bytes) > memory_length):
-        raise Exception("Not enough memory to write the configuration data")
-
-    # Write the configuration data into the memory
-    memory.write(store, config_bytes, config_ptr)
-
-    create_func = instance.exports(store)["create_system_config"]
-    result_ptr = create_func(store, config_ptr)
+def create_default_system_config(store, instance):
+    """Retrieve the default HVAC system configuration from Rust"""
+    create_func = instance.exports(store)["create_default_system_config"]
+    result_ptr = create_func(store)
     
     if result_ptr == 0:
-        raise ValueError("Failed to create system configuration")
+        raise ValueError("Failed to retrieve system configuration")
     
     return result_ptr
 
@@ -57,13 +39,20 @@ def read_string_from_memory(ptr, store, instance):
     memory = instance.exports(store)["memory"]
     data = []
     offset = 0
+    memory_length = memory.data_len(store)  # Get the total length of the memory
+
     while True:
+        # Check if the pointer+offset is within the memory bounds
+        if ptr + offset >= memory_length:
+            break
         byte = memory.read(store, ptr + offset, 1)[0]
         if byte == 0:
             break
         data.append(byte)
         offset += 1
+
     return bytes(data).decode('utf-8')
+
 
 def free_system_config(ptr, store, instance):
     free_func = instance.exports(store)["free_system_config"]
@@ -72,8 +61,7 @@ def free_system_config(ptr, store, instance):
 # Main execution
 if __name__ == "__main__":
     store, instance = setup_environment()
-    config_json = json.dumps(system_config)
-    config_ptr = create_system_config(config_json, store, instance)
+    config_ptr = create_default_system_config(store, instance)
     config_str = read_string_from_memory(config_ptr, store, instance)
     print("System Configuration Created:", config_str)
 
